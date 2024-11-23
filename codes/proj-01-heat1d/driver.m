@@ -7,11 +7,11 @@ h = 0.0;           % -u,x = h  at x = 0
 
 % Setup the mesh
 pp   = 2;              % polynomial degree
-n_en = pp + 1;         % number of element or local nodes
+n_en = pp + 1;         % number of nodes in each element
 n_el = 2;              % number of elements
-n_np = n_el * pp + 1;  % number of nodal points
+n_np = n_el * pp + 1;  % number of nodes in all physical elements
 n_eq = n_np - 1;       % number of equations
-n_int = 10;
+n_int = 10;            % number of integral sampling points in each element
 
 hh = 1.0 / (n_np - 1); % space between two adjacent nodes
 x_coor = 0 : hh : 1;   % nodal coordinates for equally spaced nodes
