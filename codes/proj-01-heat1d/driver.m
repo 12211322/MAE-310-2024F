@@ -6,18 +6,18 @@ g = 1.0;           % u    = g  at x = 1
 h = 0.0;           % -u,x = h  at x = 0
 
 % Setup the mesh
-pp   = 2;              % polynomial degree
-n_en = pp + 1;         % number of nodes in each element
-n_el = 2;              % number of elements
+pp   = 2;              % shape function's polynomial degree
+n_en = pp + 1;         % number of nodes in each element i.e. number of shape functions
+n_el = 2;              % number of physical elements
 n_np = n_el * pp + 1;  % number of nodes in all physical elements
-n_eq = n_np - 1;       % number of equations
+n_eq = n_np - 1;       % number of equations i.e. row# of F-vector
 n_int = 10;            % number of integral sampling points in each element
 
 hh = 1.0 / (n_np - 1); % space between two adjacent nodes
-x_coor = 0 : hh : 1;   % nodal coordinates for equally spaced nodes
+x_coor = 0 : hh : 1;   % nodal coordinates in all physical elements for equally spaced nodes
 
+%Set up and finish IEN array
 IEN = zeros(n_el, n_en);
-
 for ee = 1 : n_el
   for aa = 1 : n_en
     IEN(ee, aa) = (ee - 1) * pp + aa;
@@ -28,33 +28,33 @@ end
 ID = 1 : n_np;
 ID(end) = 0;
 
-% Setup the quadrature rule
+% Set up the sampling points' coordinates and weights in reference element
 [xi, weight] = Gauss(n_int, -1, 1);
 
 % allocate the stiffness matrix
-K = spalloc(n_eq, n_eq, (2*pp+1)*n_eq);
+K = spalloc(n_eq, n_eq, (2*pp+1)*n_eq); %spalloc matrix can save memory space
 F = zeros(n_eq, 1);
 
-% Assembly of the stiffness matrix and load vector
+% Set up the stiffness matrix and load vector
 for ee = 1 : n_el
   k_ele = zeros(n_en, n_en); % allocate a zero element stiffness matrix
   f_ele = zeros(n_en, 1);    % allocate a zero element load vector
 
-  x_ele = x_coor(IEN(ee,:)); % x_ele(aa) = x_coor(A) with A = IEN(aa, ee)
+  x_ele = x_coor(IEN(ee,:)); % take out each physical element's node coordinates
 
   % quadrature loop
-  for qua = 1 : n_int    
+  for qua = 1 : n_int %go through all intergal sampling points in element
     dx_dxi = 0.0;
     x_l = 0.0;
     for aa = 1 : n_en
-      x_l    = x_l    + x_ele(aa) * PolyShape(pp, aa, xi(qua), 0);
-      dx_dxi = dx_dxi + x_ele(aa) * PolyShape(pp, aa, xi(qua), 1);
+      x_l    = x_l    + x_ele(aa) * PolyShape(pp, aa, xi(qua), 0); %get I.S.P coordinates of P.E. by mapping from R.E.
+      dx_dxi = dx_dxi + x_ele(aa) * PolyShape(pp, aa, xi(qua), 1); %get dx/dξ at this I.S.P.
     end
-    dxi_dx = 1.0 / dx_dxi;
+    dxi_dx = 1.0 / dx_dxi; %get dξ/dx
 
-    for aa = 1 : n_en
+    for aa = 1 : n_en %go through all shape funtions in R.E.
       f_ele(aa) = f_ele(aa) + weight(qua) * PolyShape(pp, aa, xi(qua), 0) * f(x_l) * dx_dxi;
-      for bb = 1 : n_en
+      for bb = 1 : n_en %go through all shape funtions in R.E.
         k_ele(aa, bb) = k_ele(aa, bb) + weight(qua) * PolyShape(pp, aa, xi(qua), 1) * PolyShape(pp, bb, xi(qua), 1) * dxi_dx;
       end
     end
