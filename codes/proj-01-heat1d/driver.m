@@ -1,4 +1,4 @@
-clear all; clc; clf; % clean the memory, screen, and figure
+% clear all; clc; clf; % clean the memory, screen, and figure
 
 % Problem definition
 f = @(x) -20*x.^3; % f(x) is the source
@@ -6,7 +6,7 @@ g = 1.0;           % u    = g  at x = 1
 h = 0.0;           % -u,x = h  at x = 0
 
 % Setup the mesh
-pp   = 2;              % shape function's polynomial degree
+pp   = 1;              % shape function's polynomial degree
 n_en = pp + 1;         % number of nodes in each element i.e. number of shape functions
 n_el = 2;              % number of physical elements
 n_np = n_el * pp + 1;  % number of nodes in all physical elements
@@ -94,15 +94,22 @@ disp = [d_temp; g];
 %plot(x_sam, y_sam, '-k', 'LineWidth', 3);
 
 n_sam = 20;
-xi_sam = -1 : (2/n_sam) : 1;
+xi_sam = -1 : (2/n_sam) : 1; %take 20 intergal sampling points' coordinates in reference element
 
 x_sam = zeros(n_el * n_sam + 1, 1);
 y_sam = x_sam; % store the exact solution value at sampling points
 u_sam = x_sam; % store the numerical solution value at sampling pts
+ux_sam = x_sam;
+yx_sam = x_sam;
 
-for ee = 1 : n_el
-  x_ele = x_coor( IEN(ee, :) );
-  u_ele = disp( IEN(ee, :) );
+erLU = 0;
+erLL = 0;
+erHU = 0;
+erHL = 0;
+
+for ee = 1 : n_el %go through all physical elements
+  x_ele = x_coor( IEN(ee, :) ); %get eeth P.E.'s nodes' coordinates
+  u_ele = disp( IEN(ee, :) ); %get eeth P.E.'s nodes' coefficients
 
   if ee == n_el
     n_sam_end = n_sam+1;
@@ -110,24 +117,42 @@ for ee = 1 : n_el
     n_sam_end = n_sam;
   end
 
-  for ll = 1 : n_sam_end
+  for ll = 1 : n_sam_end %go through all intergal samping points in each P.E.
     x_l = 0.0;
     u_l = 0.0;
-    for aa = 1 : n_en
-      x_l = x_l + x_ele(aa) * PolyShape(pp, aa, xi_sam(ll), 0);
-      u_l = u_l + u_ele(aa) * PolyShape(pp, aa, xi_sam(ll), 0);
+    ux_l = 0.0;
+    for aa = 1 : n_en %go through all nodes in each P.E.
+      x_l = x_l + x_ele(aa) * PolyShape(pp, aa, xi_sam(ll), 0); %get plot's x-axis point
+      u_l = u_l + u_ele(aa) * PolyShape(pp, aa, xi_sam(ll), 0); %get uh_plot's y-axis point
+      ux_l = ux_l + 2 * n_el * u_ele(aa) * PolyShape(pp, aa, xi_sam(ll), 1);
+      
     end
 
     x_sam( (ee-1)*n_sam + ll ) = x_l;
     u_sam( (ee-1)*n_sam + ll ) = u_l;
+    ux_sam( (ee-1)*n_sam + ll ) = ux_l;
     y_sam( (ee-1)*n_sam + ll ) = x_l^5;
+    yx_sam( (ee-1)*n_sam + ll ) = 5*(x_l^4);
+
+    erLL = erLL + (x_l^5).^2;
+    erLU = erLU + (u_l - x_l^5).^2;
+    erHL = erHL + (5*(x_l^4)).^2;
+    erHU = erHU + (ux_l - 5*(x_l^4)).^2;
+
   end
 end
 
+erL = sqrt(erLU./erLL);
+erH = sqrt(erHU./erHL);
+all = [erL,erH];
 
-plot(x_sam, u_sam, '-r','LineWidth',3);
-hold on;
-plot(x_sam, y_sam, '-k','LineWidth',3);
+% plot(x_sam,ux_sam);
+% hold on
+% plot(x_sam,yx_sam);
+
+% plot(x_sam, u_sam, '-r','LineWidth',3);
+% hold on;
+% plot(x_sam, y_sam, '-k','LineWidth',3);
 
 
 
