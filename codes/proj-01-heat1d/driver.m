@@ -5,10 +5,14 @@ f = @(x) -20*x.^3; % f(x) is the source
 g = 1.0;           % u    = g  at x = 1
 h = 0.0;           % -u,x = h  at x = 0
 
+all_er = zeros(7,3);
+
+% for i = 2:2:14 %differnet number of physical elements, i.e. n_el
+% for j = 1:6
 % Setup the mesh
-pp   = 1;              % shape function's polynomial degree
+pp   = 2;              % shape function's polynomial degree
 n_en = pp + 1;         % number of nodes in each element i.e. number of shape functions
-n_el = 2;              % number of physical elements
+n_el = 3;              % number of physical elements
 n_np = n_el * pp + 1;  % number of nodes in all physical elements
 n_eq = n_np - 1;       % number of equations i.e. row# of F-vector
 n_int = 10;            % number of integral sampling points in each element
@@ -94,7 +98,7 @@ disp = [d_temp; g];
 %plot(x_sam, y_sam, '-k', 'LineWidth', 3);
 
 n_sam = 20;
-xi_sam = -1 : (2/n_sam) : 1; %take 20 intergal sampling points' coordinates in reference element
+xi_sam = -1 : (2/n_sam) : 1; %take 20 draw sampling points' coordinates in reference element
 
 x_sam = zeros(n_el * n_sam + 1, 1);
 y_sam = x_sam; % store the exact solution value at sampling points
@@ -124,10 +128,11 @@ for ee = 1 : n_el %go through all physical elements
     for aa = 1 : n_en %go through all nodes in each P.E.
       x_l = x_l + x_ele(aa) * PolyShape(pp, aa, xi_sam(ll), 0); %get plot's x-axis point
       u_l = u_l + u_ele(aa) * PolyShape(pp, aa, xi_sam(ll), 0); %get uh_plot's y-axis point
-      ux_l = ux_l + 2 * n_el * u_ele(aa) * PolyShape(pp, aa, xi_sam(ll), 1);
+      ux_l = ux_l + 2 * n_el * u_ele(aa) * PolyShape(pp, aa, xi_sam(ll), 1); %get uhx_plot's y-axis point
       
     end
 
+    %store all needed statistic
     x_sam( (ee-1)*n_sam + ll ) = x_l;
     u_sam( (ee-1)*n_sam + ll ) = u_l;
     ux_sam( (ee-1)*n_sam + ll ) = ux_l;
@@ -144,19 +149,21 @@ end
 
 erL = sqrt(erLU./erLL);
 erH = sqrt(erHU./erHL);
-all = [erL,erH];
+% all_er(j,:) = [log(erL),log(erH),j];
 
-% plot(x_sam,ux_sam);
+% plot(x_sam,ux_sam); %plot the slope
 % hold on
 % plot(x_sam,yx_sam);
 
-% plot(x_sam, u_sam, '-r','LineWidth',3);
-% hold on;
-% plot(x_sam, y_sam, '-k','LineWidth',3);
+plot(x_sam, u_sam, '-r','LineWidth',3); %plot the function
+hold on;
+plot(x_sam, y_sam, '-k','LineWidth',1);
+% end
 
-
-
-
+% x = all_er(:,3);
+% y1 = all_er(:,1);
+% y2 = all_er(:,2);
+% plot(all_er(:,3),all_er(:,2));
 
 
 
