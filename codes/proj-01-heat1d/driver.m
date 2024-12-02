@@ -7,12 +7,12 @@ h = 0.0;           % -u,x = h  at x = 0
 
 all_er = zeros(7,3);
 
-% for i = 2:2:14 %differnet number of physical elements, i.e. n_el
+for i = 2:2:16 %differnet number of physical elements, i.e. n_el
 % for j = 1:6
 % Setup the mesh
-pp   = 2;              % shape function's polynomial degree
+pp   = 3;              % shape function's polynomial degree
 n_en = pp + 1;         % number of nodes in each element i.e. number of shape functions
-n_el = 3;              % number of physical elements
+n_el = i;              % number of physical elements
 n_np = n_el * pp + 1;  % number of nodes in all physical elements
 n_eq = n_np - 1;       % number of equations i.e. row# of F-vector
 n_int = 10;            % number of integral sampling points in each element
@@ -149,21 +149,21 @@ end
 
 erL = sqrt(erLU./erLL);
 erH = sqrt(erHU./erHL);
-% all_er(j,:) = [log(erL),log(erH),j];
+all_er(i/2,:) = [log(erL),log(erH),log(hh)];
 
 % plot(x_sam,ux_sam); %plot the slope
 % hold on
 % plot(x_sam,yx_sam);
 
-plot(x_sam, u_sam, '-r','LineWidth',3); %plot the function
-hold on;
-plot(x_sam, y_sam, '-k','LineWidth',1);
-% end
+% plot(x_sam, u_sam, '-r','LineWidth',3); %plot the function
+% hold on;
+% plot(x_sam, y_sam, '-k','LineWidth',1);
+end
 
-% x = all_er(:,3);
-% y1 = all_er(:,1);
-% y2 = all_er(:,2);
-% plot(all_er(:,3),all_er(:,2));
+x = all_er(:,3);
+y1 = all_er(:,1);
+y2 = all_er(:,2);
+plot(all_er(:,3),all_er(:,2));
 
 
 
