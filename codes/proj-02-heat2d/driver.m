@@ -10,13 +10,14 @@ exact_y = @(x,y) x*(1-x)*(1-2*y);
 f = @(x,y) 2.0*kappa*x*(1-x) + 2.0*kappa*y*(1-y); % source term
 
 % quadrature rule
-n_int_xi  = 3;
-n_int_eta = 3;
-n_int     = n_int_xi * n_int_eta;
-[xi, eta, weight] = Gauss2D(n_int_xi, n_int_eta);
+n_int_xi  = 3; %take three quadrature points on ξ direction
+n_int_eta = 3; %take three quadrature points on η direction
+n_int     = n_int_xi * n_int_eta; %the number of all quadrature points in a 2D element
+% here use arrays to remember 2D points' coordinates in a reference element and 2D points in this array's order is ξ1η1 ξ2η1 ... ξ1η2 ξ2η2 ...
+[xi, eta, weight] = Gauss2D(n_int_xi, n_int_eta); %where xi remember 2D points' ξcoordinates and weight's members are two 1D weights' product
 
 % mesh generation
-n_en   = 4;               % number of nodes in an element
+n_en   = 4 ;               % number of nodes in an element
 n_el_x = 60;               % number of elements in x-dir
 n_el_y = 60;               % number of elements in y-dir
 n_el   = n_el_x * n_el_y; % total number of elements
@@ -55,15 +56,15 @@ end
 % ID array
 ID = zeros(n_np,1);
 counter = 0;
-for ny = 2 : n_np_y - 1
-  for nx = 2 : n_np_x - 1
+for ny = 2 : n_np_y - 1 %ignore the first row
+  for nx = 2 : n_np_x - 1 %ignore the first column
     index = (ny-1)*n_np_x + nx;
     counter = counter + 1;
     ID(index) = counter;  
   end
 end
 
-n_eq = counter;
+n_eq = counter; %the number of equations in Kb = f, i.e. the number of unknow points
 
 LM = ID(IEN);
 
@@ -83,17 +84,19 @@ for ee = 1 : n_el
     x_l = 0.0; y_l = 0.0;
     dx_dxi = 0.0; dx_deta = 0.0;
     dy_dxi = 0.0; dy_deta = 0.0;
-    for aa = 1 : n_en
-      x_l = x_l + x_ele(aa) * Quad(aa, xi(ll), eta(ll));
+    for aa = 1 : n_en %get each quadrature point's x = xieNi;  take (-1,-1) (1,-1) (1,1) (-1,1) when aa = 1,2,3,4
+      %Quad means the 2-order shape function on square
+      x_l = x_l + x_ele(aa) * Quad(aa, xi(ll), eta(ll)); %since the property of the node exactly, this x_l means the ture x coordinate
       y_l = y_l + y_ele(aa) * Quad(aa, xi(ll), eta(ll));    
-      [Na_xi, Na_eta] = Quad_grad(aa, xi(ll), eta(ll));
+      %Quad_grad means the 2-order shape function's derivative on square
+      [Na_xi, Na_eta] = Quad_grad(aa, xi(ll), eta(ll)); 
       dx_dxi  = dx_dxi  + x_ele(aa) * Na_xi;
       dx_deta = dx_deta + x_ele(aa) * Na_eta;
       dy_dxi  = dy_dxi  + y_ele(aa) * Na_xi;
       dy_deta = dy_deta + y_ele(aa) * Na_eta;
     end
     
-    detJ = dx_dxi * dy_deta - dx_deta * dy_dxi;
+    detJ = dx_dxi * dy_deta - dx_deta * dy_dxi; %the Jacobian determinant
     
     for aa = 1 : n_en
       Na = Quad(aa, xi(ll), eta(ll));
