@@ -84,7 +84,7 @@ for ee = 1 : n_el
     x_l = 0.0; y_l = 0.0;
     dx_dxi = 0.0; dx_deta = 0.0;
     dy_dxi = 0.0; dy_deta = 0.0;
-    for aa = 1 : n_en %get each quadrature point's x = xieNi;  take (-1,-1) (1,-1) (1,1) (-1,1) when aa = 1,2,3,4
+    for aa = 1 : n_en %get each quadrature point's x = xieNi; take (-1,-1) (1,-1) (1,1) (-1,1) when aa = 1,2,3,4
       %Quad means the 2-order shape function on square
       x_l = x_l + x_ele(aa) * Quad(aa, xi(ll), eta(ll)); %since the property of the node exactly, this x_l means the ture x coordinate
       y_l = y_l + y_ele(aa) * Quad(aa, xi(ll), eta(ll));    
