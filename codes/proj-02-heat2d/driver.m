@@ -137,15 +137,15 @@ for ee = 1 : n_el
 end
 
 % solve the stiffness matrix
-dn = K \ F;
+quad_dn = K \ F;
 
 % insert dn back into the vector for all nodes
-disp = zeros(n_np, 1);
+quad_disp = zeros(n_np, 1);
 
 for ii = 1 : n_np
   index = ID(ii);
   if index > 0
-    disp(ii) = dn(index);
+    quad_disp(ii) = quad_dn(index);
   else
     % modify disp with the g data. Here it does nothing because g is zero
   end
@@ -153,6 +153,6 @@ end
 
 % save the solution vector and number of elements to disp with name
 % HEAT.mat
-save("HEAT", "disp", "n_el_x", "n_el_y");
+% save("HEAT", "disp", "n_el_x", "n_el_y");
 
 % EOF
