@@ -23,10 +23,10 @@ for i = 20:20:100
 
 % quadrature rule
 n_int_xi  = 3; %take three quadrature points on ξ direction
-n_int_eta = 3; %take three quadrature points on η direction
-n_int     = n_int_xi * n_int_eta; %the number of all quadrature points in a 2D element
+n_int_eta = 4; %take three quadrature points on η direction
+n_int     = find_tri_n_int(n_int_xi, n_int_eta); %the number of all quadrature points in a 2D element
 % here use arrays to remember 2D points' coordinates in a reference element and 2D points in this array's order is ξ1η1 ξ2η1 ... ξ1η2 ξ2η2 ...
-[xi, eta, weight] = Gauss2D(n_int_xi, n_int_eta); %where xi remember 2D points' ξcoordinates and weight's members are two 1D weights' product
+[xi, eta, weight] = tri_Gauss2D(n_int_xi, n_int_eta); %where xi remember 2D points' ξcoordinates and weight's members are two 1D weights' product
 
 % mesh generation
 n_en   = 3 ;               % number of nodes in an element
