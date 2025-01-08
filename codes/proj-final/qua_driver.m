@@ -1,25 +1,22 @@
 clear all
-kappa = 1.0; % conductivity
-
-% exact solution
-exact = @(x,y) x*(1-x)*y*(1-y);
-exact_x = @(x,y) (1-2*x)*y*(1-y);
-exact_y = @(x,y) x*(1-x)*(1-2*y);
-exact_xx = @(x,y) -2*y*(1-y);
-exact_xy = @(x,y) (1-2*x)*(1-2*y);
-exact_yy = @(x,y) -2*x*(1-x);
-
-% take_x = 0:0.01:1;
-% take_y = 0:0.01:1;
-% [xx, yy] = meshgrid(take_x, take_y);
-% zz = xx.*(1-xx).*yy.*(1-yy);
-% mesh(xx,yy,zz);
+E = 1e9; % physical property
+v = 0.3;
+lamuda = E*v/(1+v)/(1-2*v);
+miu = E/2/(1+v);
+fx = @(x,y) (2*E*y*(y - 1))/(v^2 - 1) - (E*(v/2 - 1/2)*((x - 1)*(y - 1) + x*y + 2*x*(x - 1) + x*(y - 1) + y*(x - 1)))/(v^2 - 1) + (E*v*((x - 1)*(y - 1) + x*y + x*(y - 1) + y*(x - 1)))/(v^2 - 1);
+fy = @(x,y) (2*E*x*(x - 1))/(v^2 - 1) - (E*(v/2 - 1/2)*((x - 1)*(y - 1) + x*y + x*(y - 1) + y*(x - 1) + 2*y*(y - 1)))/(v^2 - 1) + (E*v*((x - 1)*(y - 1) + x*y + x*(y - 1) + y*(x - 1)))/(v^2 - 1);
+exactX = @(x,y) x*(1-x)*y*(1-y); exactY = @(x,y) x*(1-x)*y*(1-y);
+exactX_x = @(x,y) (1-2*x)*y*(1-y); exactY_x = @(x,y) (1-2*x)*y*(1-y);
+exactX_y = @(x,y) x*(1-x)*(1-2*y); exactY_y = @(x,y) x*(1-x)*(1-2*y); 
+exactX_xx = @(x,y) -2*y*(1-y); exactY_xx = @(x,y) -2*y*(1-y);
+exactX_xy = @(x,y) (1-2*x)*(1-2*y); exactY_xy = @(x,y) (1-2*x)*(1-2*y);
+exactX_yy = @(x,y) -2*x*(1-x); exactY_yy = @(x,y) -2*x*(1-x);
 
 f = @(x,y) 2.0*kappa*x*(1-x) + 2.0*kappa*y*(1-y); % source term
 
-all_data = zeros(5,3);
+all_data = zeros(4,3);
 
-%for i = 20:20:100
+for i = 20:20:80
 
 % quadrature rule
 n_int_xi  = 3; %take three quadrature points on ξ direction
@@ -30,8 +27,8 @@ n_int     = n_int_xi * n_int_eta; %the number of all quadrature points in a 2D e
 
 % mesh generation
 n_en   = 4;               % number of nodes in an element
-n_el_x = 3;               % number of elements in x-dir
-n_el_y = 3;               % number of elements in y-dir
+n_el_x = i;               % number of elements in x-dir
+n_el_y = i;               % number of elements in y-dir
 qua_n_el   = n_el_x * n_el_y; % total number of elements
 
 n_np_x = n_el_x + 1;      % number of nodal points in x-dir
@@ -81,6 +78,13 @@ end
 n_eq = counter; %the number of equations in Kb = f, i.e. the number of unknow points
 
 % LM array
+% LM = zeros(qua_n_el, n_en, 2);
+% for ii = 1:qua_n_el
+%     for jj = 1:n_en
+%         LM(ii,jj,1) = ID(qua_IEN(ii,jj),1);
+%         LM(ii,jj,2) = ID(qua_IEN(ii,jj),2);
+%     end
+% end
 LM = zeros(qua_n_el, 2*n_en);
 for ii = 1:qua_n_el
     for jj = 1:2*n_en
@@ -88,98 +92,118 @@ for ii = 1:qua_n_el
     end
 end
 
+D = (E/(1-v*v)).*[1, v, 0; 
+     v, 1, 0; 
+     0, 0, 0.5-0.5*v]; %in 2D case
+
+K = zeros(n_eq,n_eq);
+F = zeros(n_eq,1);
+
+%loop over element to assembly the matrix and vector
+
+for ee = 1:qua_n_el
+    x_ele = x_coor(qua_IEN(ee, :));
+    y_ele = y_coor(qua_IEN(ee, :));
+
+    k_ele = zeros(2*n_en,2*n_en);
+    f_ele = zeros(2*n_en,1);
+
+    for ll = 1:n_int
+        x_l = 0.0; y_l = 0.0;
+        dx_dxi = 0.0; dx_deta = 0.0;
+        dy_dxi = 0.0; dy_deta = 0.0;
+        for aa = 1:n_en
+            x_l = x_l + x_ele(aa) * Quad(aa, xi(ll), eta(ll));
+            y_l = y_l + y_ele(aa) * Quad(aa, xi(ll), eta(ll));
+            [Na_xi, Na_eta] = Quad_grad(aa, xi(ll), eta(ll));
+            dx_dxi  = dx_dxi  + x_ele(aa) * Na_xi;
+            dx_deta = dx_deta + x_ele(aa) * Na_eta;
+            dy_dxi  = dy_dxi  + y_ele(aa) * Na_xi;
+            dy_deta = dy_deta + y_ele(aa) * Na_eta;
+        end
+
+        detJ = dx_dxi * dy_deta - dx_deta * dy_dxi; %the Jacobian determinant
+
+        for aa = 1 : n_en
+            Na = Quad(aa, xi(ll), eta(ll));
+            [Na_xi, Na_eta] = Quad_grad(aa, xi(ll), eta(ll));
+            Na_x = (Na_xi * dy_deta - Na_eta * dy_dxi) / detJ;
+            Na_y = (-Na_xi * dx_deta + Na_eta * dx_dxi) / detJ;
+
+            f_ele(2*aa-1) = f_ele(2*aa-1) + weight(ll) * detJ * fx(x_l, y_l) * Na;
+            f_ele(2*aa) = f_ele(2*aa) + weight(ll) * detJ * fy(x_l, y_l) * Na;
+
+            for bb = 1 : n_en
+                Nb = Quad(bb, xi(ll), eta(ll));
+                [Nb_xi, Nb_eta] = Quad_grad(bb, xi(ll), eta(ll));
+                Nb_x = (Nb_xi * dy_deta - Nb_eta * dy_dxi) / detJ;
+                Nb_y = (-Nb_xi * dx_deta + Nb_eta * dx_dxi) / detJ;
+
+                B_a = [Na_x, 0; 0, Na_y; Na_y, Na_x]; B_b = [Nb_x, 0; 0, Nb_y; Nb_y, Nb_x];
+                k_ele(2*aa-1:2*aa,2*bb-1:2*bb) = k_ele(2*aa-1:2*aa,2*bb-1:2*bb) + (weight(ll) * detJ) .* B_a' * D * B_b;
 
 
+            end % end of bb loop
+        end % end of aa loop
+    end % end of quadrature loop
 
-% % allocate the stiffness matrix and load vector
-% K = spalloc(n_eq, n_eq, 9 * n_eq);
-% F = zeros(n_eq, 1);
+    for ii = 1:2
+        for aa = 1 : n_en
+            pp = 2*(aa-1) + ii;
+            PP = LM(ee, pp);
+            if PP > 0
+                F(PP) = F(PP) + f_ele(pp);
+                for jj = 1:2
+                    for bb = 1 : n_en
+                        qq = 2*(bb-1) + jj;
+                        QQ = LM(ee, qq);
+                        if QQ > 0
+                            K(PP, QQ) = K(PP, QQ) + k_ele(pp, qq);
+                        else
+                            % modify F with the boundary data
+                            % here we do nothing because the boundary data g is zero or
+                            % homogeneous
+                        end
+                    end
+                end
+            end
+        end
+    end
+end
+
+qua_dn = K \ F;
+x_disp = zeros(n_np, 1);
+y_disp = zeros(n_np, 1);
+for ii = 1 : n_np
+    x_index = ID(ii,1);
+    y_index = ID(ii,2);
+    if x_index > 0
+        x_disp(ii) = qua_dn(x_index);
+        if y_index > 0
+            y_disp(ii) = qua_dn(y_index);
+        else
+        end
+    else
+        % modify disp with the g data. Here it does nothing because g is zero
+    end
+end
+
+% draw part
+% [X, Y] = meshgrid(0 : hx : 1, 0 : hy : 1);
+% hold on;
+% Z = reshape(x_disp, n_np_x, n_np_y)';
+% surf(X, Y, Z);
 % 
-% % loop over element to assembly the matrix and vector
-% for ee = 1 : qua_n_el
-%   x_ele = x_coor( qua_IEN(ee, 1:n_en) );
-%   y_ele = y_coor( qua_IEN(ee, 1:n_en) );
-% 
-%   k_ele = zeros(n_en, n_en); % element stiffness matrix
-%   f_ele = zeros(n_en, 1);    % element load vector
-% 
-%   for ll = 1 : n_int
-%     x_l = 0.0; y_l = 0.0;
-%     dx_dxi = 0.0; dx_deta = 0.0;
-%     dy_dxi = 0.0; dy_deta = 0.0;
-%     for aa = 1 : n_en %get each quadrature point's x = xieNi; take (-1,-1) (1,-1) (1,1) (-1,1) when aa = 1,2,3,4
-%       %Quad means the 1-order shape function on triangle
-%       x_l = x_l + x_ele(aa) * Quad(aa, xi(ll), eta(ll)); %since the property of the node exactly, this x_l means the ture x coordinate
-%       y_l = y_l + y_ele(aa) * Quad(aa, xi(ll), eta(ll));    
-%       %Quad_grad means the 1-order shape function's derivative on triangle
-%       [Na_xi, Na_eta] = Quad_grad(aa, xi(ll), eta(ll)); 
-%       dx_dxi  = dx_dxi  + x_ele(aa) * Na_xi;
-%       dx_deta = dx_deta + x_ele(aa) * Na_eta;
-%       dy_dxi  = dy_dxi  + y_ele(aa) * Na_xi;
-%       dy_deta = dy_deta + y_ele(aa) * Na_eta;
-%     end
-% 
-%     detJ = dx_dxi * dy_deta - dx_deta * dy_dxi; %the Jacobian determinant
-% 
-%     for aa = 1 : n_en
-%       Na = Quad(aa, xi(ll), eta(ll));
-%       [Na_xi, Na_eta] = Quad_grad(aa, xi(ll), eta(ll));
-%       Na_x = (Na_xi * dy_deta - Na_eta * dy_dxi) / detJ;
-%       Na_y = (-Na_xi * dx_deta + Na_eta * dx_dxi) / detJ;
-% 
-%       f_ele(aa) = f_ele(aa) + weight(ll) * detJ * f(x_l, y_l) * Na;
-% 
-%       for bb = 1 : n_en
-%         Nb = Quad(bb, xi(ll), eta(ll));
-%         [Nb_xi, Nb_eta] = Quad_grad(bb, xi(ll), eta(ll));
-%         Nb_x = (Nb_xi * dy_deta - Nb_eta * dy_dxi) / detJ;
-%         Nb_y = (-Nb_xi * dx_deta + Nb_eta * dx_dxi) / detJ;
-% 
-%         k_ele(aa, bb) = k_ele(aa,bb) + weight(ll) * detJ * kappa * (Na_x * Nb_x + Na_y * Nb_y);
-%       end % end of bb loop
-%     end % end of aa loop
-%   end % end of quadrature loop
-% 
-%   for aa = 1 : n_en
-%     PP = LM(ee, aa);
-%     if PP > 0
-%       F(PP) = F(PP) + f_ele(aa);
-% 
-%       for bb = 1 : n_en
-%         QQ = LM(ee, bb);
-%         if QQ > 0
-%           K(PP, QQ) = K(PP, QQ) + k_ele(aa, bb);
-%         else
-%           % modify F with the boundary data
-%           % here we do nothing because the boundary data g is zero or
-%           % homogeneous
-%         end
-%       end  
-%     end
-%   end
-% end
-% 
-% % solve the stiffness matrix
-% qua_dn = K \ F;
-% 
-% % insert dn back into the vector for all nodes
-% qua_disp = zeros(n_np, 1);
-% 
-% for ii = 1 : n_np
-%   index = ID(ii);
-%   if index > 0
-%     qua_disp(ii) = qua_dn(index);
-%   else
-%     % modify disp with the g data. Here it does nothing because g is zero
-%   end
-% end
-% 
+% shading interp;
+% axis equal;
+
 % %integral part
 % e0 = 0.0; e1 = 0.0; u2 = 0.0;
 % for ee = 1 : qua_n_el
 %     x_ele = x_coor(qua_IEN(ee, :));
 %     y_ele = y_coor(qua_IEN(ee, :));
-%     d_ele = qua_disp(qua_IEN(ee, :));
+%     cx_ele = x_disp(qua_IEN(ee, :));
+%     cy_ele = y_disp(qua_IEN(ee, :));
 % 
 %     for ll = 1 : n_int
 %         x_l = 0.0; y_l = 0.0; 
@@ -198,16 +222,17 @@ end
 %         detJ = dx_dxi * dy_deta - dx_deta * dy_dxi;
 % 
 %         %gain the coordinates of integral points, we can calculate uh ...
-%         u_l = exact(x_l, y_l);
-%         u_x_l = exact_x(x_l, y_l); u_y_l = exact_y(x_l, y_l);
-%         u_xx_l = exact_xx(x_l, y_l); u_xy_l = exact_xy(x_l, y_l); u_yy_l = exact_yy(x_l, y_l);
+%         u_l = sqrt(exactX(x_l, y_l).^2 + exactY(x_l, y_l).^2);
+%         u_x_l = sqrt(exactX_x(x_l, y_l).^2 + exactY_x(x_l, y_l).^2); u_y_l = sqrt(exactX_y(x_l, y_l).^2 + exactY_y(x_l, y_l).^2);
+%         u_xx_l = sqrt(exactX_xx(x_l, y_l).^2 + exactY_xx(x_l, y_l).^2); u_xy_l = sqrt(exactX_xy(x_l, y_l).^2 + exactY_xy(x_l, y_l).^2); u_yy_l = sqrt(exactX_yy(x_l, y_l).^2 + exactY_yy(x_l, y_l).^2);
 % 
 %         for aa = 1 : n_en %this loop is to calculate the value of uh_l ...
-%             uh_l = uh_l + d_ele(aa) * Quad(aa, xi(ll), eta(ll));
+%             c_ele = sqrt(cx_ele(aa).^2 + cy_ele(aa).^2);
+%             uh_l = uh_l + c_ele * Quad(aa, xi(ll), eta(ll));
 %             [Na_xi, Na_eta] = Quad_grad(aa, xi(ll), eta(ll));
 % 
-%             uh_x_l = uh_x_l + d_ele(aa) * (Na_xi * dy_deta - Na_eta * dy_dxi) / detJ;
-%             uh_y_l = uh_y_l + d_ele(aa) * (-Na_xi * dx_deta + Na_eta * dx_dxi) / detJ;
+%             uh_x_l = uh_x_l + c_ele * (Na_xi * dy_deta - Na_eta * dy_dxi) / detJ;
+%             uh_y_l = uh_y_l + c_ele * (-Na_xi * dx_deta + Na_eta * dx_dxi) / detJ;
 %         end
 % 
 %         %we should add weights in the integral loop
@@ -216,20 +241,73 @@ end
 %         u2 = u2 + weight(ll) * (u_l.^2 + u_x_l.^2 + u_y_l.^2 + u_xx_l.^2 + 2*(u_xy_l.^2) + u_yy_l.^2);
 %     end
 % end
-% 
-% L2_space = sqrt(e0./u2);
-% H1_space = sqrt(e1./u2);
+
+%integral part
+e0 = 0.0; e1 = 0.0; u2 = 0.0;
+for ee = 1 : qua_n_el
+    x_ele = x_coor(qua_IEN(ee, :));
+    y_ele = y_coor(qua_IEN(ee, :));
+    cx_ele = x_disp(qua_IEN(ee, :));
+    cy_ele = y_disp(qua_IEN(ee, :));
+
+    for ll = 1 : n_int
+        x_l = 0.0; y_l = 0.0; 
+        dx_dxi = 0.0; dx_deta = 0.0; dy_dxi = 0.0; dy_deta = 0.0;
+        uh_l = 0.0; uh_x_l = 0.0; uh_y_l = 0.0;
+
+        for aa = 1 : n_en %this loop is to calculate the value of dx_dxi...
+            x_l = x_l + x_ele(aa) * Quad(aa, xi(ll), eta(ll)); %since the property of the node exactly, this x_l means the ture x coordinate of the integral point
+            y_l = y_l + y_ele(aa) * Quad(aa, xi(ll), eta(ll));
+            [Na_xi, Na_eta] = Quad_grad(aa, xi(ll), eta(ll));
+            dx_dxi  = dx_dxi  + x_ele(aa) * Na_xi;
+            dx_deta = dx_deta + x_ele(aa) * Na_eta;
+            dy_dxi  = dy_dxi  + y_ele(aa) * Na_xi;
+            dy_deta = dy_deta + y_ele(aa) * Na_eta;
+        end
+        detJ = dx_dxi * dy_deta - dx_deta * dy_dxi;
+
+        %gain the coordinates of integral points, we can calculate uh ...
+        u_l = exactX(x_l, y_l);
+        u_x_l = exactX_x(x_l, y_l); u_y_l = exactX_y(x_l, y_l);
+        u_xx_l = exactX_xx(x_l, y_l); u_xy_l = exactX_xy(x_l, y_l); u_yy_l = exactX_yy(x_l, y_l);
+
+        for aa = 1 : n_en %this loop is to calculate the value of uh_l ...
+            c_ele = cx_ele(aa);
+            uh_l = uh_l + c_ele * Quad(aa, xi(ll), eta(ll));
+            [Na_xi, Na_eta] = Quad_grad(aa, xi(ll), eta(ll));
+
+            uh_x_l = uh_x_l + c_ele * (Na_xi * dy_deta - Na_eta * dy_dxi) / detJ;
+            uh_y_l = uh_y_l + c_ele * (-Na_xi * dx_deta + Na_eta * dx_dxi) / detJ;
+        end
+
+        %we should add weights in the integral loop
+        e0 = e0 + weight(ll) * ((u_l - uh_l).^2);
+        e1 = e1 + weight(ll) * ((u_l - uh_l).^2 + (u_x_l - uh_x_l).^2 + (u_y_l - uh_y_l).^2);
+        u2 = u2 + weight(ll) * (u_l.^2 + u_x_l.^2 + u_y_l.^2 + u_xx_l.^2 + 2*(u_xy_l.^2) + u_yy_l.^2);
+    end
+end
+
+L2_space = sqrt(e0./u2);
+H1_space = sqrt(e1./u2);
 
 
-%all_data(i/20,:) = [log(hx), log(L2_space), log(H1_space)];
-%end
+all_data(i/20,:) = [log(hx), log(L2_space), log(H1_space)];
+end
 
-% plot(all_data(:,1),all_data(:,2));
-% hold on
-% plot(all_data(:,1),all_data(:,3));
-% legend('e in L2','e in H1');
-% save the solution vector and number of elements to disp with name
-% HEAT.mat
-% save("HEAT", "disp", "n_el_x", "n_el_y");
+plot(all_data(:,1),all_data(:,2));
+hold on
+plot(all_data(:,1),all_data(:,3));
+legend('e in L2','e in H1');
+
+
+
+
+
+
+
+
+
+
+
 
 % EOF
