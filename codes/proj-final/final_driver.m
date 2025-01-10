@@ -5,9 +5,8 @@ E = 1e9;
 G = E/2/(1+v);
 
 %boundary coundary
-fx = 0; fy = 0;
-
-
+fx = @(x,y)  0; fy = @(x,y) 0;
+find_xystress; %get the stress function in x_y_coordinate: s_xx, s_yy, s_xy
 
 %exact solution
 
@@ -19,15 +18,28 @@ n_int = n_int_xi * n_int_eta;
 [xi, eta, weight] = Gauss2D(n_int_xi, n_int_eta);
 
 %mesh generation
-quarter;
+quarterr;
 n_en = 4; %number of nodes in each element
 n_el = size(msh.QUADS,1); %number of all elements
 n_np = msh.nbNod; %number of all nodes
 x_coor = msh.POS(:,1);
 y_coor = msh.POS(:,2);
 
+%true coordinates
+pos(:,1) = msh.POS(:,1) + 1;
+pos(:,2) = msh.POS(:,2) + 1;
+
 %IEN array
+IEN_tri = zeros(1,1);
 IEN = msh.QUADS(:,1:4);
+for ee = 1:size(IEN,1)
+    IEN_tri(ee*2-1,1) = IEN(ee,1);
+    IEN_tri(ee*2-1,2) = IEN(ee,2);
+    IEN_tri(ee*2-1,3) = IEN(ee,3);
+    IEN_tri(ee*2,1) = IEN(ee,1);
+    IEN_tri(ee*2,2) = IEN(ee,3);
+    IEN_tri(ee*2,3) = IEN(ee,4);
+end
 
 %ID array
 ID = -1 .* ones(n_np,2);
@@ -51,6 +63,25 @@ for ii = 1:n_np
     end
 end
 n_eq = index;
+
+%LN array (add the normal vector)
+LN = msh.LINES;
+for ii = 1: size(LN,1)
+    if LN(ii,3) == 10
+        LN(ii,4) = 0; LN(ii,5) = 1;
+    elseif LN(ii,3) == 8
+        LN(ii,4) = 1; LN(ii,5) = 0;
+    elseif LN(ii,3) == 12
+        coor1 = [pos(LN(ii,1),1),pos(LN(ii,1),2)]; coor2 = [pos(LN(ii,2),1),pos(LN(ii,2),2)];
+        mid = (coor1 + coor2)./2;
+        LN(ii,4) = -mid(1)/sqrt(mid(1)^2 + mid(2)^2); LN(ii,5) = -mid(2)/sqrt(mid(1)^2 + mid(2)^2);
+    elseif LN(ii,3) == 9
+        LN(ii,4) = -1; LN(ii,5) = 0;
+    elseif LN(ii,3) == 11
+        LN(ii,4) = 0; LN(ii,4) = -1;
+    end
+end
+
 
 %LM array
 LM = zeros(n_el, 2*n_en);
@@ -79,7 +110,7 @@ for ee = 1:n_el
         x_l = 0.0; y_l = 0.0;
         dx_dxi = 0.0; dx_deta = 0.0;
         dy_dxi = 0.0; dy_deta = 0.0;
-        for aa = 1:n_en
+        for aa = 1:n_en %this loop means the Na part
             x_l = x_l + x_ele(aa) * Quad(aa, xi(ll), eta(ll));
             y_l = y_l + y_ele(aa) * Quad(aa, xi(ll), eta(ll));
             [Na_xi, Na_eta] = Quad_grad(aa, xi(ll), eta(ll));
@@ -97,8 +128,10 @@ for ee = 1:n_el
             Na_x = (Na_xi * dy_deta - Na_eta * dy_dxi) / detJ;
             Na_y = (-Na_xi * dx_deta + Na_eta * dx_dxi) / detJ;
 
-            f_ele(2*aa-1) = f_ele(2*aa-1) + weight(ll) * detJ * fx(x_l, y_l) * Na;
+            f_ele(2*aa - 1) = f_ele(2*aa - 1) + weight(ll) * detJ * fx(x_l, y_l) * Na;
             f_ele(2*aa) = f_ele(2*aa) + weight(ll) * detJ * fy(x_l, y_l) * Na;
+
+            
 
             for bb = 1 : n_en
                 Nb = Quad(bb, xi(ll), eta(ll));
@@ -120,6 +153,9 @@ for ee = 1:n_el
             PP = LM(ee, pp);
             if PP > 0
                 F(PP) = F(PP) + f_ele(pp);
+
+
+
                 for jj = 1:2
                     for bb = 1 : n_en
                         qq = 2*(bb-1) + jj;
@@ -134,6 +170,46 @@ for ee = 1:n_el
                     end
                 end
             end
+        end
+    end
+end
+
+%add the line intergal part on F vector
+n_int_bc = 5;
+n_en_bc = 2;
+[xi_bc, weight_bc] = Gauss(n_int_bc, -1, 1);
+for ee = 1:size(LN,1)
+    f_ele_bc = zeros(2*n_en_bc,1);
+    x_ele_bc = x_coor(LN(ee,1:2));
+    y_ele_bc = y_coor(LN(ee,1:2));
+    s = sqrt((x_ele_bc(1)-x_ele_bc(2))^2 + (y_ele_bc(1)-y_ele_bc(2))^2);
+    for ll = 1:n_int_bc
+        x_l_bc = 0.0;
+        y_l_bc = 0.0;
+        for aa = 1:n_en_bc
+            x_l_bc = x_l_bc + x_ele_bc(aa) * PolyShape(1, aa, xi_bc(ll), 0);
+            y_l_bc = y_l_bc + y_ele_bc(aa) * PolyShape(1, aa, xi_bc(ll), 0);            
+        end
+        
+        se_xx = s_xx(x_l_bc,y_l_bc); se_yy = s_yy(x_l_bc,y_l_bc); se_xy = s_xy(x_l_bc,y_l_bc);
+        h_v = [se_xx, se_xy; se_xy, se_yy] * [LN(ee,4);LN(ee,5)];
+        hx = h_v(1); hy = h_v(2);
+
+        for aa = 1:n_en_bc
+            f_ele_bc(2*aa-1) = f_ele_bc(2*aa-1) + weight(ll) * PolyShape(1, aa, xi(ll), 0) * hx * s / 2;
+            f_ele_bc(2*aa) = f_ele_bc(2*aa) + weight(ll) * PolyShape(1, aa, xi(ll), 0) * hy * s / 2;
+
+        end
+    end
+
+    for dd = 1:2
+        PP1 = ID(LN(ee,1),dd);
+        if PP1 > 0
+        F(PP1) = F(PP1) + f_ele_bc(2*dd-1);
+        end
+        PP2 = ID(LN(ee,2),dd);
+        if PP2 > 0
+        F(PP2) = F(PP2) + f_ele_bc(2*dd);
         end
     end
 end
@@ -157,6 +233,12 @@ end
 
 
 
+hold on;
+
+trisurf(IEN_tri, x_coor, y_coor, y_disp);
+shading interp;
+axis equal;
+colormap jet;
 
 
 
