@@ -25,4 +25,4 @@ fx2 = - diff(sig112,x) - diff(sig122,y);
 fy2 = - diff(sig122,x) - diff(sig222,y);
 
 
-
+f_num = subs(fx, v, 0.3);
